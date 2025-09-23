@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Test</title>
+    <style>
+        .knowledge-panel {
+            position: fixed;
+            top: 0;
+            right: -600px;
+            width: 600px;
+            height: 100vh;
+            background: white;
+            transition: right 0.3s ease;
+            z-index: 2000;
+            border-left: 2px solid #ccc;
+        }
+        .knowledge-panel.open {
+            right: 0;
+        }
+        .panel-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0,0,0,0.5);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 1999;
+        }
+        .panel-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        .drag-area {
+            border: 2px dashed #ccc;
+            padding: 50px;
+            text-align: center;
+            margin: 50px;
+        }
+        .drag-area.dragover {
+            border-color: blue;
+            background: #f0f0f0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Debug Test</h1>
+    
+    <button onclick="openKnowledgePanel()">Open Panel</button>
+    
+    <div class="drag-area" id="dragArea">
+        Drag files here
+    </div>
+    
+    <div id="knowledgePanel" class="knowledge-panel">
+        <h2>Panel</h2>
+        <button onclick="closeKnowledgePanel()">Close</button>
+    </div>
+    
+    <div id="panelOverlay" class="panel-overlay" onclick="closeKnowledgePanel()"></div>
+
+    <script>
+        function openKnowledgePanel() {
+            console.log('Opening panel');
+            const panel = document.getElementById('knowledgePanel');
+            const overlay = document.getElementById('panelOverlay');
+            
+            if (panel) {
+                panel.classList.add('open');
+            }
+            if (overlay) {
+                overlay.classList.add('show');
+            }
+        }
+        
+        function closeKnowledgePanel() {
+            const panel = document.getElementById('knowledgePanel');
+            const overlay = document.getElementById('panelOverlay');
+            
+            if (panel) {
+                panel.classList.remove('open');
+            }
+            if (overlay) {
+                overlay.classList.remove('show');
+            }
+        }
+        
+        // Drag and drop
+        const dragArea = document.getElementById('dragArea');
+        
+        dragArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            dragArea.classList.add('dragover');
+        });
+        
+        dragArea.addEventListener('dragleave', function(e) {
+            dragArea.classList.remove('dragover');
+        });
+        
+        dragArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            dragArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            console.log('Files dropped:', files.length);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Knowledge Base Panel</title>
+    <style>
+        /* Knowledge Base Panel Styles */
+        .knowledge-panel {
+            position: fixed;
+            top: 0;
+            right: -600px;
+            width: 600px;
+            height: 100vh;
+            background: white;
+            box-shadow: -5px 0 30px rgba(0, 0, 0, 0.2);
+            transition: right 0.3s ease;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .knowledge-panel.open {
+            right: 0;
+        }
+
+        .panel-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 1999;
+        }
+
+        .panel-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Panel Header */
+        .panel-header {
+            background: linear-gradient(135deg, #8b5cf6, #6366f1);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .panel-title {
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 4px;
+            transition: background 0.2s ease;
+        }
+
+        .close-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Panel Content */
+        .panel-content {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Input Section */
+        .input-section {
+            padding: 20px;
+            border-bottom: 1px solid #e5e7eb;
+            background: #f8f9ff;
+        }
+
+        .input-tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 16px;
+            background: white;
+            padding: 4px;
+            border-radius: 8px;
+        }
+
+        .input-tab {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            background: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            color: #6b7280;
+        }
+
+        .input-tab.active {
+            background: linear-gradient(135deg, #8b5cf6, #6366f1);
+            color: white;
+        }
+
+        .input-content {
+            display: none;
+        }
+
+        .input-content.active {
+            display: block;
+        }
+
+        .file-drop-zone {
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            margin-bottom: 12px;
+        }
+
+        .file-drop-zone:hover,
+        .file-drop-zone.dragover {
+            border-color: #8b5cf6;
+            background: #f3f4f6;
+        }
+
+        .text-input {
+            width: 100%;
+            height: 100px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 14px;
+            resize: vertical;
+        }
+
+        .url-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .voice-recorder {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 20px;
+        }
+
+        .record-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .record-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .record-btn.recording {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .add-btn {
+            background: linear-gradient(135deg, #8b5cf6, #6366f1);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 12px;
+        }
+
+        /* Knowledge Tree Section */
+        .tree-section {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .tree-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .filter-btn {
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        /* Tree Structure */
+        .knowledge-tree {
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .tree-node {
+            margin: 4px 0;
+        }
+
+        .node-content {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            gap: 8px;
+        }
+
+        .node-content:hover {
+            background: #e5e7eb;
+        }
+
+        .node-content.selected {
+            background: #ddd6fe;
+            border-left: 3px solid #8b5cf6;
+        }
+
+        .node-expand {
+            width: 16px;
+            height: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .node-icon {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .node-icon.folder {
+            background: #fef3c7;
+        }
+
+        .node-icon.file {
+            background: #dbeafe;
+        }
+
+        .node-title {
+            flex: 1;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .node-actions {
+            opacity: 0;
+            display: flex;
+            gap: 4px;
+            transition: opacity 0.2s ease;
+        }
+
+        .node-content:hover .node-actions {
+            opacity: 1;
+        }
+
+        .node-action {
+            width: 24px;
+            height: 24px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        .node-action:hover {
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        .node-children {
+            margin-left: 24px;
+            display: none;
+        }
+
+        .node-children.expanded {
+            display: block;
+        }
+
+        .node-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 4px;
+        }
+
+        .tag {
+            background: #f3f4f6;
+            color: #6b7280;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 10px;
+        }
+
+        /* Templates Section */
+        .templates-section {
+            margin-top: 20px;
+        }
+
+        .templates-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .template-card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .template-card:hover {
+            border-color: #8b5cf6;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.1);
+        }
+
+        .template-title {
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .template-desc {
+            font-size: 10px;
+            color: #6b7280;
+        }
+
+        /* Bottom Actions */
+        .panel-footer {
+            padding: 20px;
+            border-top: 1px solid #e5e7eb;
+            background: #f9fafb;
+        }
+
+        .footer-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .footer-btn {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .footer-btn.primary {
+            background: linear-gradient(135deg, #8b5cf6, #6366f1);
+            color: white;
+            border: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .knowledge-panel {
+                width: 100vw;
+                right: -100vw;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Knowledge Base Panel -->
+    <div id="knowledgePanel" class="knowledge-panel">
+        <!-- Panel Header -->
+        <div class="panel-header">
+            <div class="panel-title">
+                🧩 Smart Knowledge Base
+            </div>
+            <button class="close-btn" onclick="closeKnowledgePanel()">×</button>
+        </div>
+
+        <!-- Panel Content -->
+        <div class="panel-content">
+            <!-- Multi-modal Input Section -->
+            <div class="input-section">
+                <div class="input-tabs">
+                    <button class="input-tab active" onclick="switchInputTab('text')">📝 Text</button>
+                    <button class="input-tab" onclick="switchInputTab('file')">📁 File</button>
+                    <button class="input-tab" onclick="switchInputTab('url')">🔗 URL</button>
+                    <button class="input-tab" onclick="switchInputTab('voice')">🎤 Voice</button>
+                </div>
+
+                <!-- Text Input -->
+                <div id="textInput" class="input-content active">
+                    <textarea class="text-input" placeholder="Enter your content here...
+Supports Markdown formatting
+• Lists
+• **Bold** text
+• [Links](url)"></textarea>
+                    <button class="add-btn" onclick="addTextContent()">Add to Knowledge Base</button>
+                </div>
+
+                <!-- File Upload -->
+                <div id="fileInput" class="input-content">
+                    <div class="file-drop-zone" onclick="document.getElementById('fileUpload').click()">
+                        <div>📁 Drop files here or click to upload</div>
+                        <div style="font-size: 12px; color: #6b7280; margin-top: 8px;">
+                            Supports: PDF, Word, Excel, Images, Audio, Video
+                        </div>
+                    </div>
+                    <input type="file" id="fileUpload" style="display: none;" multiple 
+                           accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.mp3,.mp4,.wav">
+                    <button class="add-btn" onclick="processFiles()">Process & Add Files</button>
+                </div>
+
+                <!-- URL Input -->
+                <div id="urlInput" class="input-content">
+                    <input type="url" class="url-input" placeholder="https://example.com/article">
+                    <div style="font-size: 12px; color: #6b7280; margin-top: 8px;">
+                        Auto-extract content from web pages, articles, blogs
+                    </div>
+                    <button class="add-btn" onclick="fetchUrlContent()">Fetch & Add Content</button>
+                </div>
+
+                <!-- Voice Input -->
+                <div id="voiceInput" class="input-content">
+                    <div class="voice-recorder">
+                        <button class="record-btn" id="recordBtn" onclick="toggleRecording()">🎤</button>
+                        <div>
+                            <div style="font-weight: 500;">Voice to Text</div>
+                            <div style="font-size: 12px; color: #6b7280;">Click to start recording</div>
+                        </div>
+                    </div>
+                    <button class="add-btn" onclick="processVoiceContent()">Add Voice Content</button>
+                </div>
+            </div>
+
+            <!-- Knowledge Tree Section -->
+            <div class="tree-section">
+                <!-- Search and Filter -->
+                <div class="tree-header">
+                    <div style="font-weight: 600; font-size: 16px;">📚 Knowledge Tree</div>
+                    <button class="filter-btn" onclick="showImportTemplates()">+ Template</button>
+                </div>
+
+                <div class="search-box">
+                    <input type="text" class="search-input" placeholder="Search knowledge..." onkeyup="searchKnowledge(this.value)">
+                    <button class="filter-btn" onclick="toggleAdvancedSearch()">🔍</button>
+                </div>
+
+                <!-- Knowledge Tree -->
+                <div class="knowledge-tree" id="knowledgeTree">
+                    <!-- Marketing Strategy Folder -->
+                    <div class="tree-node">
+                        <div class="node-content" onclick="selectNode(this)">
+                            <div class="node-expand" onclick="toggleNode(event, this)">▶</div>
+                            <div class="node-icon folder">📁</div>
+                            <div class="node-title">Marketing Strategy</div>
+                            <div class="node-actions">
+                                <button class="node-action" onclick="editNode(event, this)" title="Edit">✏️</button>
+                                <button class="node-action" onclick="deleteNode(event, this)" title="Delete">🗑️</button>
+                            </div>
+                        </div>
+                        <div class="node-children">
+                            <div class="tree-node">
+                                <div class="node-content" onclick="selectNode(this)">
+                                    <div class="node-expand"></div>
+                                    <div class="node-icon file">📄</div>
+                                    <div class="node-title">Australian Market Analysis</div>
+                                    <div class="node-actions">
+                                        <button class="node-action" onclick="editNode(event, this)">✏️</button>
+                                        <button class="node-action" onclick="deleteNode(event, this)">🗑️</button>
+                                    </div>
+                                </div>
+                                <div class="node-tags">
+                                    <span class="tag">marketing</span>
+                                    <span class="tag">australia</span>
+                                </div>
+                            </div>
+                            <div class="tree-node">
+                                <div class="node-content" onclick="selectNode(this)">
+                                    <div class="node-expand"></div>
+                                    <div class="node-icon file">📄</div>
+                                    <div class="node-title">Target Audience Research</div>
+                                    <div class="node-actions">
+                                        <button class="node-action" onclick="editNode(event, this)">✏️</button>
+                                        <button class="node-action" onclick="deleteNode(event, this)">🗑️</button>
+                                    </div>
+                                </div>
+                                <div class="node-tags">
+                                    <span class="tag">research</span>
+                                    <span class="tag">audience</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Content Creation Folder -->
+                    <div class="tree-node">
+                        <div class="node-content" onclick="selectNode(this)">
+                            <div class="node-expand" onclick="toggleNode(event, this)">▶</div>
+                            <div class="node-icon folder">📁</div>
+                            <div class="node-title">Content Creation</div>
+                            <div class="node-actions">
+                                <button class="node-action" onclick="editNode(event, this)">✏️</button>
+                                <button class="node-action" onclick="deleteNode(event, this)">🗑️</button>
+                            </div>
+                        </div>
+                        <div class="node-children">
+                            <div class="tree-node">
+                                <div class="node-content" onclick="selectNode(this)">
+                                    <div class="node-expand"></div>
+                                    <div class="node-icon file">📄</div>
+                                    <div class="node-title">AI Writing Framework</div>
+                                    <div class="node-actions">
+                                        <button class="node-action" onclick="editNode(event, this)">✏️</button>
+                                        <button class="node-action" onclick="deleteNode(event, this)">🗑️</button>
+                                    </div>
+                                </div>
+                                <div class="node-tags">
+                                    <span class="tag">AI</span>
+                                    <span class="tag">writing</span>
+                                    <span class="tag">framework</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Template Library -->
+                <div class="templates-section">
+                    <div style="font-weight: 600; font-size: 14px; margin-bottom: 8px;">📋 Template Library</div>
+                    <div class="templates-grid">
+                        <div class="template-card" onclick="importTemplate('marketing')">
+                            <div class="template-title">🎯 Marketing Strategy</div>
+                            <div class="template-desc">Audience analysis, competitor research, positioning</div>
+                        </div>
+                        <div class="template-card" onclick="importTemplate('content')">
+                            <div class="template-title">✍️ Content Framework</div>
+                            <div class="template-desc">Writing templates, headline formulas, CTAs</div>
+                        </div>
+                        <div class="template-card" onclick="importTemplate('social')">
+                            <div class="template-title">📱 Social Media</div>
+                            <div class="template-desc">Platform guides, post templates, engagement</div>
+                        </div>
+                        <div class="template-card" onclick="importTemplate('analytics')">
+                            <div class="template-title">📊 Analytics Guide</div>
+                            <div class="template-desc">KPIs, metrics, reporting templates</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel Footer -->
+        <div class="panel-footer">
+            <div class="footer-actions">
+                <button class="footer-btn" onclick="exportKnowledge()">📤 Export</button>
+                <button class="footer-btn" onclick="importKnowledge()">📥 Import</button>
+                <button class="footer-btn primary" onclick="useSelectedContent()">✨ Use in Workflow</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel Overlay -->
+    <div id="panelOverlay" class="panel-overlay" onclick="closeKnowledgePanel()"></div>
+
+    <script>
+        let isRecording = false;
+        let selectedNode = null;
+
+        // Panel control functions
+        function openKnowledgePanel() {
+            document.getElementById('knowledgePanel').classList.add('open');
+            document.getElementById('panelOverlay').classList.add('show');
+        }
+
+        function closeKnowledgePanel() {
+            document.getElementById('knowledgePanel').classList.remove('open');
+            document.getElementById('panelOverlay').classList.remove('show');
+        }
+
+        // Input tab switching
+        function switchInputTab(tabName) {
+            // Remove active from all tabs and contents
+            document.querySelectorAll('.input-tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.input-content').forEach(content => content.classList.remove('active'));
+            
+            // Activate selected tab and content
+            event.target.classList.add('active');
+            document.getElementById(tabName + 'Input').classList.add('active');
+        }
+
+        // Content processing functions
+        function addTextContent() {
+            const textArea = document.querySelector('#textInput textarea');
+            const content = textArea.value.trim();
+            if (!content) return;
+            
+            // Auto-categorize and add to tree
+            const category = smartCategorize(content);
+            addToKnowledgeTree(content.substring(0, 50) + '...', 'text', category, generateTags(content));
+            
+            textArea.value = '';
+            showNotification('Text content added to knowledge base! 🎉');
+        }
+
+        function processFiles() {
+            const fileInput = document.getElementById('fileUpload');
+            const files = fileInput.files;
+            
+            for (let file of files) {
+                // Simulate file processing
+                const category = smartCategorizeFile(file);
+                addToKnowledgeTree(file.name, 'file', category, generateFileTags(file));
+            }
+            
+            fileInput.value = '';
+            showNotification(`${files.length} files processed and added! 📁`);
+        }
+
+        function fetchUrlContent() {
+            const urlInput = document.querySelector('#urlInput input');
+            const url = urlInput.value.trim();
+            if (!url) return;
+            
+            // Simulate URL content extraction
+            showNotification('Fetching content from URL... 🔍');
+            
+            setTimeout(() => {
+                const title = 'Extracted: ' + new URL(url).hostname;
+                addToKnowledgeTree(title, 'url', 'Web Content', ['web', 'article']);
+                urlInput.value = '';
+                showNotification('URL content extracted and added! 🌐');
+            }, 2000);
+        }
+
+        function toggleRecording() {
+            const recordBtn = document.getElementById('recordBtn');
+            
+            if (!isRecording) {
+                isRecording = true;
+                recordBtn.classList.add('recording');
+                recordBtn.innerHTML = '⏹️';
+                showNotification('Recording started... 🎤');
+                
+                // Simulate recording
+                setTimeout(() => {
+                    isRecording = false;
+                    recordBtn.classList.remove('recording');
+                    recordBtn.innerHTML = '🎤';
+                    showNotification('Recording completed! Click "Add Voice Content" to process.');
+                }, 5000);
+            } else {
+                isRecording = false;
+                recordBtn.classList.remove('recording');
+                recordBtn.innerHTML = '🎤';
+                showNotification('Recording stopped.');
+            }
+        }
+
+        function processVoiceContent() {
+            if (!isRecording) {
+                addToKnowledgeTree('Voice Note: Meeting Discussion', 'voice', 'Audio Notes', ['voice', 'meeting']);
+                showNotification('Voice content transcribed and added! 🎙️');
+            }
+        }
+
+        // Tree management functions
+        function toggleNode(event, element) {
+            event.stopPropagation();
+            const children = element.closest('.tree-node').querySelector('.node-children');
+            const isExpanded = children.classList.contains('expanded');
+            
+            if (isExpanded) {
+                children.classList.remove('expanded');
+                element.innerHTML = '▶';
+            } else {
+                children.classList.add('expanded');
+                element.innerHTML = '▼';
+            }
+        }
+
+        function selectNode(element) {
+            // Remove selection from all nodes
+            document.querySelectorAll('.node-content').forEach(node => {
+                node.classList.remove('selected');
+            });
+            
+            // Select current node
+            element.classList.add('selected');
+            selectedNode = element;
+        }
+
+        function addToKnowledgeTree(title, type, category, tags) {
+            // This would integrate with the actual knowledge base API
+            console.log('Adding to knowledge tree:', { title, type, category, tags });
+        }
+
+        // Smart categorization functions
+        function smartCategorize(content) {
+            const marketingWords = ['marketing', 'campaign', 'audience', 'brand', 'strategy'];
+            const contentWords = ['writing', 'content', 'blog', 'article', 'copy'];
+            const analyticsWords = ['analytics', 'data', 'metrics', 'KPI', 'performance'];
+            
+            const lowerContent = content.toLowerCase();
+            
+            if (marketingWords.some(word => lowerContent.includes(word))) return 'Marketing Strategy';
+            if (contentWords.some(word => lowerContent.includes(word))) return 'Content Creation';
+            if (analyticsWords.some(word => lowerContent.includes(word))) return 'Analytics';
+            
+            return 'General';
+        }
+
+        function smartCategorizeFile(file) {
+            const name = file.name.toLowerCase();
+            if (name.includes('marketing') || name.includes('campaign')) return 'Marketing Strategy';
+            if (name.includes('content') || name.includes('copy')) return 'Content Creation';
+            if (name.includes('analytics') || name.includes('data')) return 'Analytics';
+            return 'Documents';
+        }
+
+        function generateTags(content) {
+            // Simple tag generation based on keywords
+            const words = content.toLowerCase().match(/\b\w+\b/g) || [];
+            const commonTags = ['marketing', 'strategy', 'content', 'australia', 'ai', 'social', 'media'];
+            return commonTags.filter(tag => words.includes(tag)).slice(0, 3);
+        }
+
+        function generateFileTags(file) {
+            const ext = file.name.split('.').pop().toLowerCase();
+            const baseTags = [ext];
+            
+            if (['pdf', 'doc', 'docx'].includes(ext)) baseTags.push('document');
+            if (['jpg', 'png', 'gif'].includes(ext)) baseTags.push('image');
+            if (['mp3', 'wav'].includes(ext)) baseTags.push('audio');
+            if (['mp4', 'avi'].includes(ext)) baseTags.push('video');
+            
+            return baseTags;
+        }
+
+        // Search and filter functions
+        function searchKnowledge(query) {
+            const nodes = document.querySelectorAll('.tree-node');
+            const lowerQuery = query.toLowerCase();
+            
+            nodes.forEach(node => {
+                const title = node.querySelector('.node-title').textContent.toLowerCase();
+                const tags = Array.from(node.querySelectorAll('.tag')).map(tag => tag.textContent.toLowerCase());
+                
+                const matches = title.includes(lowerQuery) || tags.some(tag => tag.includes(lowerQuery));
+                node.style.display = matches || !query ? 'block' : 'none';
+            });
+        }
+
+        // Template functions
+        function importTemplate(templateType) {
+            const templates = {
+                marketing: 'Marketing Strategy Template imported with audience analysis framework',
+                content: 'Content Creation Framework imported with writing templates',
+                social: 'Social Media Guide imported with platform-specific strategies',
+                analytics: 'Analytics Template imported with KPI tracking sheets'
+            };
+            
+            addToKnowledgeTree(templates[templateType], 'template', 'Templates', [templateType, 'template']);
+            showNotification(`${templateType} template imported successfully! 📋`);
+        }
+
+        // Utility functions
+        function showNotification(message) {
+            // Simple notification system
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: linear-gradient(135deg, #10b981, #059669);
+                color: white;
+                padding: 12px 20px;
+                border-radius: 8px;
+                font-size: 14px;
+                z-index: 3000;
+                animation: slideInRight 0.3s ease;
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.remove();
+            }, 3000);
+        }
+
+        // File drag and drop
+        const fileDropZone = document.querySelector('.file-drop-zone');
+        
+        fileDropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileDropZone.classList.add('dragover');
+        });
+        
+        fileDropZone.addEventListener('dragleave', () => {
+            fileDropZone.classList.remove('dragover');
+        });
+        
+        fileDropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileDropZone.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            document.getElementById('fileUpload').files = files;
+            processFiles();
+        });
+
+        // Add CSS animations
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideInRight {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>

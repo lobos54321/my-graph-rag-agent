@@ -1,0 +1,45 @@
+{
+  "name": "intelligent-content-workflow",
+  "version": "1.0.0",
+  "description": "AI驱动的智能内容创作工作流系统",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "server": "cd server && npm run dev",
+    "setup": "npm install && cd server && npm install"
+  },
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "antd": "^5.12.0",
+    "@reduxjs/toolkit": "^2.0.0",
+    "react-redux": "^9.0.0",
+    "axios": "^1.6.0",
+    "d3": "^7.8.5",
+    "recharts": "^2.8.0",
+    "react-dropzone": "^14.2.3",
+    "react-markdown": "^9.0.0",
+    "socket.io-client": "^4.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "eslint": "^8.0.0",
+    "eslint-config-next": "^14.0.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "AI",
+    "content-creation",
+    "workflow",
+    "GraphRAG",
+    "智能创作"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}
