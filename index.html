@@ -707,7 +707,12 @@
                                     "
                                     placeholder="Smart Input - Type text, paste URLs, or drop files here...
 
-Examples:
+🌐 URL Examples:
+• YouTube: https://www.youtube.com/watch?v=dQw4w9WgXcQ
+• Website: https://example.com
+• Article: https://blog.example.com/post
+
+📝 Text Examples:
 📊 Marketing campaign strategy
 ✍️ Blog article draft  
 📱 Social media content
@@ -923,6 +928,71 @@ Key insight: 78% of Australian consumers prefer brands demonstrating local marke
 The challenge: How do we scale content production while preserving the casual, authentic tone that resonates with Australian audiences? The answer lies in strategic human-AI collaboration.`;
             
             document.getElementById('contentInput').value = demoContent;
+            isManualInput = false; // Mark as automatic content
+        }
+
+        // Add event listeners to detect manual user input
+        document.addEventListener('DOMContentLoaded', function() {
+            const contentInput = document.getElementById('contentInput');
+            if (contentInput) {
+                // Detect manual typing
+                contentInput.addEventListener('input', function(e) {
+                    // Only mark as manual if the event is from user interaction
+                    if (e.isTrusted) {
+                        isManualInput = true;
+                        
+                        // 🔥 当用户开始输入新内容时，清理之前的结果
+                        if (contentInput.value.trim().length > 0) {
+                            clearPreviousResults();
+                        }
+                    }
+                });
+                
+                // Detect manual paste
+                contentInput.addEventListener('paste', function(e) {
+                    if (e.isTrusted) {
+                        isManualInput = true;
+                    }
+                });
+                
+                // Reset manual flag when content is cleared
+                contentInput.addEventListener('focus', function() {
+                    if (!contentInput.value.trim()) {
+                        isManualInput = false;
+                    }
+                });
+            }
+        });
+
+        // 🔥 清理之前的结果显示（不清理输入内容）
+        function clearPreviousResults() {
+            console.log('🧹 清理之前的结果显示');
+            
+            // 清空结果显示区域
+            const resultsContainer = document.getElementById('results');
+            if (resultsContainer) {
+                resultsContainer.innerHTML = '';
+            }
+            
+            // 清空URL内容区域
+            const urlContent = document.getElementById('urlContent');
+            if (urlContent) {
+                urlContent.style.display = 'none';
+                urlContent.innerHTML = '';
+            }
+            
+            // 清空上传文件显示区域
+            const uploadedFiles = document.getElementById('uploadedFiles');
+            if (uploadedFiles) {
+                uploadedFiles.innerHTML = '';
+            }
+            
+            // 清空全局结果缓存
+            window.lastAnalysisResult = null;
+            window.lastProcessedContent = null;
+            window.currentUploadedFiles = [];
+            
+            console.log('✅ 已清理之前的结果显示');
         }
 
         // Send content function (combines load demo and analyze)
@@ -932,11 +1002,18 @@ The challenge: How do we scale content production while preserving the casual, a
                 alert('请输入内容后再发送');
                 return;
             }
+            
+            // Check if content is from manual user input
+            if (!isManualInput) {
+                alert('请手动输入内容或修改现有内容后再发送。\n系统检测到当前内容来自自动加载，而非用户输入。');
+                return;
+            }
+            
             // Call the existing analyze function
             analyzeContent();
         }
 
-        // Analyze content
+        // Analyze content with smart URL detection
         function analyzeContent() {
             const content = document.getElementById('contentInput').value.trim();
             if (!content) {
@@ -944,6 +1021,91 @@ The challenge: How do we scale content production while preserving the casual, a
                 return;
             }
 
+            console.log('🔍 智能内容分析开始:', content.substring(0, 100) + '...');
+
+            // Smart detection: Check if content is a URL
+            if (isValidURL(content)) {
+                console.log('🌐 检测到URL输入，使用URL分析模式');
+                analyzeURL(content);
+                return;
+            }
+
+            // If not URL, proceed with regular text analysis
+            console.log('📝 检测到文本输入，使用文本分析模式');
+            analyzeTextContent(content);
+        }
+
+        // URL validation function
+        function isValidURL(string) {
+            try {
+                new URL(string);
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        // Analyze URL content
+        async function analyzeURL(url) {
+            console.log('🌐 开始URL分析:', url);
+            
+            // Update workflow step
+            updateActiveStep('analysis');
+            
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').classList.remove('show');
+            
+            try {
+                console.log('📡 发送URL到GraphRAG API...');
+                
+                // Call the URL scraping API
+                const response = await fetch('http://localhost:8000/api/scrape', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url: url })
+                });
+                
+                const data = await response.json();
+                console.log('📡 GraphRAG API响应状态:', response.status);
+                console.log('✅ GraphRAG Agent分析完成!');
+                console.log('🔍 完整分析结果:', data);
+                
+                if (data.status === 'success' && data.analysis) {
+                    // Hide loading and show results
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('results').classList.add('show');
+                    updateActiveStep('research');
+                    
+                    // Display URL analysis results
+                    displayURLAnalysisResults(data.analysis, url);
+                    
+                    // 🔥 自动保存到知识树
+                    const urlFile = new File([data.analysis.content], 
+                        `url_${new URL(url).hostname}_${Date.now()}.txt`, 
+                        { type: 'text/plain' });
+                    urlFile.sourceUrl = url;
+                    
+                    await autoSaveToKnowledgeTree(urlFile, data);
+                    console.log('✅ URL内容已自动保存到知识树');
+                    
+                } else {
+                    throw new Error(data.message || data.error || 'URL分析失败');
+                }
+                
+            } catch (error) {
+                console.error('❌ URL分析错误:', error);
+                document.getElementById('loading').style.display = 'none';
+                alert('URL分析失败: ' + error.message + '\n请检查URL是否有效或服务是否正常运行');
+            }
+        }
+
+        // Analyze regular text content (original function)
+        async function analyzeTextContent(content) {
+            console.log('📝 开始文本内容分析');
+            
             // Analyze trends first
             const trendMatches = analyzeTrendsForContent(content);
             if (trendMatches.length > 0) {
@@ -961,14 +1123,250 @@ The challenge: How do we scale content production while preserving the casual, a
             document.getElementById('loading').style.display = 'block';
             document.getElementById('results').classList.remove('show');
             
-            // Simulate API call
-            setTimeout(() => {
+            try {
+                console.log('📡 发送文本内容到GraphRAG API进行分析...');
+                
+                // Call the text analysis API
+                const response = await fetch('http://localhost:8000/api/analyze-text', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ content: content })
+                });
+                
+                const data = await response.json();
+                console.log('📡 文本分析API响应状态:', response.status);
+                console.log('✅ 文本分析完成!');
+                console.log('🔍 完整分析结果:', data);
+                
+                if (data.status === 'success' && data.analysis) {
+                    // Hide loading and show results
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('results').classList.add('show');
+                    updateActiveStep('research');
+                    
+                    // Display text analysis results
+                    displayTextAnalysisResults(data.analysis, content);
+                    
+                    // 🔥 自动保存到知识树
+                    const textFile = new File([content], 
+                        `manual_input_${Date.now()}.txt`, 
+                        { type: 'text/plain' });
+                    
+                    await autoSaveToKnowledgeTree(textFile, data);
+                    console.log('✅ 文本内容已自动保存到知识树');
+                    
+                } else {
+                    throw new Error(data.message || data.error || '文本分析失败');
+                }
+                
+            } catch (error) {
+                console.error('❌ 文本分析错误:', error);
+                console.log('⚠️ API调用失败，使用本地模拟分析');
+                
+                // 如果API失败，使用本地模拟分析
+                await performLocalTextAnalysis(content);
+            }
+        }
+        
+        // 本地文本分析（当API不可用时的后备方案）
+        async function performLocalTextAnalysis(content) {
+            console.log('🔧 使用本地模拟分析');
+            
+            // 简单的本地分析逻辑
+            const entities = extractEntitiesFromText(content);
+            const concepts = extractConceptsFromText(content);
+            
+            const localAnalysis = {
+                content: content,
+                entities: entities,
+                concepts: concepts,
+                confidence: 0.7,
+                source: 'local_analysis'
+            };
+            
+            // 模拟分析结果
+            const mockResult = {
+                status: 'success',
+                analysis: localAnalysis,
+                positionSuggestion: {
+                    primarySuggestion: {
+                        path: '文本内容/用户输入/手动输入'
+                    }
+                }
+            };
+            
+            setTimeout(async () => {
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('results').classList.add('show');
                 updateActiveStep('research');
                 
-                // Continue workflow simulation
-            }, 3000);
+                // Display local analysis results
+                displayTextAnalysisResults(localAnalysis, content);
+                
+                // 🔥 自动保存到知识树
+                const textFile = new File([content], 
+                    `manual_input_${Date.now()}.txt`, 
+                    { type: 'text/plain' });
+                
+                await autoSaveToKnowledgeTree(textFile, mockResult);
+                console.log('✅ 文本内容已自动保存到知识树（本地分析）');
+                
+            }, 2000);
+        }
+        
+        // 简单的实体提取
+        function extractEntitiesFromText(text) {
+            const entities = [];
+            
+            // 检测人名（简单的中英文人名模式）
+            const namePattern = /[A-Z][a-z]+\s+[A-Z][a-z]+|[\u4e00-\u9fa5]{2,4}(?:先生|女士|教授|博士)?/g;
+            let matches = text.match(namePattern);
+            if (matches) {
+                entities.push(...matches.slice(0, 5));
+            }
+            
+            // 检测组织机构
+            const orgPattern = /[A-Z][A-Za-z]*(?:\s+[A-Z][A-Za-z]*)*(?:\s+(?:Inc|Corp|LLC|Ltd|Company|University|School))?/g;
+            matches = text.match(orgPattern);
+            if (matches) {
+                entities.push(...matches.filter(m => m.length > 3).slice(0, 3));
+            }
+            
+            // 检测中文关键词
+            const chineseKeywords = text.match(/[\u4e00-\u9fa5]{2,6}/g);
+            if (chineseKeywords) {
+                const filtered = chineseKeywords.filter(k => 
+                    !['这个', '那个', '我们', '他们', '可以', '应该', '因为', '所以', '但是', '如果', '虽然', '然而'].includes(k)
+                );
+                entities.push(...filtered.slice(0, 5));
+            }
+            
+            return [...new Set(entities)].slice(0, 10); // 去重并限制数量
+        }
+        
+        // 简单的概念提取
+        function extractConceptsFromText(text) {
+            const concepts = [];
+            
+            // 技术概念
+            const techConcepts = ['AI', '人工智能', '机器学习', '深度学习', '算法', '数据', '系统', '平台', '技术', '开发', '编程', '代码'];
+            techConcepts.forEach(concept => {
+                if (text.includes(concept)) {
+                    concepts.push(concept);
+                }
+            });
+            
+            // 商业概念
+            const businessConcepts = ['管理', '营销', '策略', '市场', '客户', '服务', '产品', '品牌', '价值', '创新'];
+            businessConcepts.forEach(concept => {
+                if (text.includes(concept)) {
+                    concepts.push(concept);
+                }
+            });
+            
+            // 学习概念
+            const learningConcepts = ['学习', '教育', '培训', '知识', '技能', '经验', '方法', '理论', '实践'];
+            learningConcepts.forEach(concept => {
+                if (text.includes(concept)) {
+                    concepts.push(concept);
+                }
+            });
+            
+            return [...new Set(concepts)].slice(0, 8); // 去重并限制数量
+        }
+        
+        // Display text analysis results
+        function displayTextAnalysisResults(analysis, originalContent) {
+            console.log('🎨 显示文本分析结果:', analysis);
+            
+            // Update the results section with real analysis data
+            const resultsContainer = document.getElementById('results');
+            if (resultsContainer) {
+                // Create analysis summary
+                const content = analysis.content || originalContent;
+                const entities = analysis.entities || [];
+                const concepts = analysis.concepts || [];
+                
+                // Add text-specific results display
+                const textResultsHtml = `
+                    <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 12px; margin: 20px 0;">
+                        <h3>📝 文本分析结果</h3>
+                        <div style="margin: 10px 0;">
+                            <strong>📄 内容长度:</strong> ${content.length} 字符
+                        </div>
+                        <div style="margin: 10px 0;">
+                            <strong>🏷️ 提取实体:</strong> ${entities.length} 个
+                            ${entities.slice(0,8).map(e => `<span style="background: #8b5cf6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 12px; margin: 2px;">${e}</span>`).join('')}
+                        </div>
+                        <div style="margin: 10px 0;">
+                            <strong>💡 识别概念:</strong> ${concepts.length} 个
+                            ${concepts.slice(0,6).map(c => `<span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 4px; font-size: 12px; margin: 2px;">${c}</span>`).join('')}
+                        </div>
+                        <div style="margin: 10px 0;">
+                            <strong>📝 完整内容:</strong>
+                            <div style="background: rgba(0,0,0,0.1); padding: 15px; border-radius: 8px; font-size: 13px; max-height: 400px; overflow-y: auto; margin-top: 5px; white-space: pre-wrap;">
+                                ${content}
+                            </div>
+                        </div>
+                        <div style="margin: 10px 0; font-size: 12px; color: rgba(255,255,255,0.7);">
+                            ${analysis.source === 'local_analysis' ? '🔧 本地分析结果' : '🤖 AI分析结果'}
+                        </div>
+                    </div>
+                `;
+                
+                // Insert text results at the beginning of the results container
+                resultsContainer.insertAdjacentHTML('afterbegin', textResultsHtml);
+            }
+            
+            console.log('✅ 文本分析结果显示完成');
+        }
+
+        // Display URL analysis results
+        function displayURLAnalysisResults(analysis, originalUrl) {
+            console.log('🎨 显示URL分析结果:', analysis);
+            
+            // Update the results section with real analysis data
+            const resultsContainer = document.getElementById('results');
+            if (resultsContainer) {
+                // Create analysis summary
+                const content = analysis.content || '';
+                const entities = analysis.entities || [];
+                const concepts = analysis.concepts || [];
+                
+                // Add URL-specific results display
+                const urlResultsHtml = `
+                    <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 12px; margin: 20px 0;">
+                        <h3>🌐 URL分析结果</h3>
+                        <div style="margin: 10px 0;">
+                            <strong>📊 分析URL:</strong> ${originalUrl}
+                        </div>
+                        <div style="margin: 10px 0;">
+                            <strong>📄 内容长度:</strong> ${content.length} 字符
+                        </div>
+                        <div style="margin: 10px 0;">
+                            <strong>🏷️ 提取实体:</strong> ${entities.length} 个
+                            ${entities.slice(0,5).map(e => `<span style="background: #8b5cf6; color: white; padding: 2px 6px; border-radius: 4px; font-size: 12px; margin: 2px;">${e}</span>`).join('')}
+                        </div>
+                        <div style="margin: 10px 0;">
+                            <strong>💡 识别概念:</strong> ${concepts.length} 个
+                            ${concepts.slice(0,5).map(c => `<span style="background: #10b981; color: white; padding: 2px 6px; border-radius: 4px; font-size: 12px; margin: 2px;">${c}</span>`).join('')}
+                        </div>
+                        <div style="margin: 10px 0;">
+                            <strong>📝 完整内容:</strong>
+                            <div style="background: rgba(0,0,0,0.1); padding: 15px; border-radius: 8px; font-size: 13px; max-height: 400px; overflow-y: auto; margin-top: 5px; white-space: pre-wrap;">
+                                ${content}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                // Insert URL results at the beginning of the results container
+                resultsContainer.insertAdjacentHTML('afterbegin', urlResultsHtml);
+            }
+            
+            console.log('✅ URL分析结果显示完成');
         }
 
         function updateTrendingInsightsForContent(matches) {
@@ -2207,7 +2605,7 @@ The challenge: How do we scale content production while preserving the casual, a
         // Test GraphRAG service connection
         async function testGraphRAGConnection() {
             try {
-                const response = await fetch('http://127.0.0.1:8001/api/health', {
+                const response = await fetch('http://127.0.0.1:8000/api/graphrag/health', {
                     method: 'GET',
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -2392,7 +2790,7 @@ The challenge: How do we scale content production while preserving the casual, a
             const formData = new FormData();
             formData.append('file', textBlob, `combined_docs_${Date.now()}.txt`);
 
-            const response = await fetch('http://127.0.0.1:8001/api/graphrag/analyze', {
+            const response = await fetch('http://127.0.0.1:8000/api/graphrag/analyze', {
                 method: 'POST',
                 body: formData
             });
@@ -5861,6 +6259,52 @@ The challenge: How do we scale content production while preserving the casual, a
             
             // 新增：即时文件内容分析
             async analyzeFileOnUpload(file) {
+                // 🚨 DEBUG: GraphRAG Service 函数入口追踪
+                console.log('🚨 DEBUG: ======= GraphRAG Service analyzeFileOnUpload 函数被调用 =======');
+                console.log('🚨 DEBUG: 传入的File对象详细信息:');
+                console.log('🚨 DEBUG: - File名称:', file.name);
+                console.log('🚨 DEBUG: - File大小:', file.size, '字节');
+                console.log('🚨 DEBUG: - File类型:', file.type);
+                console.log('🚨 DEBUG: - File构造器:', file.constructor.name);
+                console.log('🚨 DEBUG: - File对象完整信息:', file);
+                
+                // 🚨 DEBUG: 检查File对象的自定义属性
+                if (file.sourceUrl) {
+                    console.log('🚨 DEBUG: - 检测到sourceUrl:', file.sourceUrl);
+                    console.log('🚨 DEBUG: - 这是从URL创建的File对象！');
+                    if (file.sourceUrl.includes('youtube.com') || file.sourceUrl.includes('youtu.be')) {
+                        console.log('🚨 DEBUG: ⚠️  关键发现：这是YouTube URL的File对象！');
+                        console.log('🚨 DEBUG: ⚠️  期望：系统应该检测到这是视频内容并调用视频提取管道');
+                        console.log('🚨 DEBUG: ⚠️  问题：如果系统把它当作普通HTML文件处理，就会出现内容不正确的问题');
+                    }
+                }
+                if (file.title) {
+                    console.log('🚨 DEBUG: - 检测到title:', file.title);
+                }
+                
+                // 🚨 DEBUG: 预读取File内容进行分析
+                try {
+                    const fileText = await file.text();
+                    console.log('🚨 DEBUG: - File内容长度:', fileText.length);
+                    console.log('🚨 DEBUG: - File内容预览（前200字符）:', fileText.substring(0, 200));
+                    
+                    // 检查是否是YouTube URL内容
+                    if (fileText.includes('youtube.com') && fileText.length < 200) {
+                        console.log('🚨 DEBUG: ⚠️  关键发现：File内容是简短的YouTube URL！');
+                        console.log('🚨 DEBUG: ⚠️  这表明File对象可能包含URL而不是提取的内容');
+                    }
+                    
+                    // 检查是否是HTML页面内容  
+                    if (fileText.includes('<html') || fileText.includes('<!DOCTYPE') || 
+                        fileText.includes('关于 新闻 版权')) {
+                        console.log('🚨 DEBUG: ⚠️  关键发现：File内容是HTML页面内容！');
+                        console.log('🚨 DEBUG: ⚠️  这可能就是问题所在：YouTube URL被当作HTML页面处理');
+                    }
+                } catch (textError) {
+                    console.log('🚨 DEBUG: - 无法预读取File内容:', textError);
+                }
+                
+                console.log('🚨 DEBUG: 即将进入函数主要逻辑...');
                 console.log('🚀 开始文件分析:', file.name);
                 
                 // 如果服务未连接，先尝试重新连接
@@ -7238,6 +7682,55 @@ The challenge: How do we scale content production while preserving the casual, a
             
             // 🚀 使用真正的GraphRAG Agent服务
             async useGraphRAGAgent(file) {
+                // 🚨 DEBUG: GraphRAG Agent 调用入口追踪
+                console.log('🚨 DEBUG: ======= useGraphRAGAgent 函数被调用 =======');
+                console.log('🚨 DEBUG: 准备发送File对象到GraphRAG后端服务');
+                console.log('🚨 DEBUG: - 服务连接状态:', this.isConnected);
+                console.log('🚨 DEBUG: - 后端URL:', this.graphRAGUrl);
+                
+                // 🚨 DEBUG: 详细分析传入的File对象
+                console.log('🚨 DEBUG: 传入File对象详细分析:');
+                console.log('🚨 DEBUG: - File名称:', file.name);
+                console.log('🚨 DEBUG: - File大小:', file.size, '字节');
+                console.log('🚨 DEBUG: - File类型:', file.type);
+                console.log('🚨 DEBUG: - 最后修改时间:', file.lastModified ? new Date(file.lastModified) : 'N/A');
+                
+                // 🚨 DEBUG: 检查自定义属性
+                if (file.sourceUrl) {
+                    console.log('🚨 DEBUG: - sourceUrl存在:', file.sourceUrl);
+                    if (file.sourceUrl.includes('youtube.com') || file.sourceUrl.includes('youtu.be')) {
+                        console.log('🚨 DEBUG: ⚠️  关键：这是YouTube URL生成的File对象！');
+                        console.log('🚨 DEBUG: ⚠️  期望：GraphRAG后端应该检测到这是视频URL并使用视频提取管道');
+                        console.log('🚨 DEBUG: ⚠️  期望结果：2694字符的视频转录内容');
+                        console.log('🚨 DEBUG: ⚠️  问题场景：如果返回98字符说明被错误当作HTML文件处理');
+                    }
+                }
+                
+                // 🚨 DEBUG: 尝试预读文件内容
+                try {
+                    const fileContent = await file.text();
+                    console.log('🚨 DEBUG: - 文件实际内容长度:', fileContent.length);
+                    console.log('🚨 DEBUG: - 文件内容预览（前300字符）:');
+                    console.log('🚨 DEBUG:   "' + fileContent.substring(0, 300) + '"');
+                    
+                    // 检查内容特征
+                    const isUrl = fileContent.trim().startsWith('http') && fileContent.length < 200;
+                    const isHtml = fileContent.includes('<html') || fileContent.includes('<!DOCTYPE');
+                    const isYouTubeGeneric = fileContent.includes('关于 新闻 版权');
+                    
+                    console.log('🚨 DEBUG: - 内容类型分析:');
+                    console.log('🚨 DEBUG:   * 是URL: ', isUrl);
+                    console.log('🚨 DEBUG:   * 是HTML: ', isHtml);
+                    console.log('🚨 DEBUG:   * 是YouTube通用页面: ', isYouTubeGeneric);
+                    
+                    if (isYouTubeGeneric) {
+                        console.log('🚨 DEBUG: ⚠️  发现问题：File内容是YouTube通用页面，不是视频转录！');
+                        console.log('🚨 DEBUG: ⚠️  这说明URL被错误处理为HTML页面提取');
+                    }
+                } catch (readError) {
+                    console.log('🚨 DEBUG: - 无法读取文件内容:', readError);
+                }
+                
                 console.log('🤖 调用GraphRAG Agent进行多格式文档处理');
                 console.log('📄 文件信息:', {
                     name: file.name,
@@ -7286,6 +7779,64 @@ The challenge: How do we scale content production while preserving the casual, a
                     }
                     
                     const graphRAGResult = await response.json();
+                    
+                    // 🚨 DEBUG: GraphRAG 后端响应详细分析
+                    console.log('🚨 DEBUG: ======= GraphRAG后端响应详细分析 =======');
+                    console.log('🚨 DEBUG: 响应状态码:', response.status);
+                    console.log('🚨 DEBUG: 响应完整对象:', graphRAGResult);
+                    
+                    // 分析响应结构
+                    console.log('🚨 DEBUG: 响应结构分析:');
+                    console.log('🚨 DEBUG: - status:', graphRAGResult.status);
+                    console.log('🚨 DEBUG: - analysis存在:', !!graphRAGResult.analysis);
+                    console.log('🚨 DEBUG: - extraction_method:', graphRAGResult.extraction_method);
+                    console.log('🚨 DEBUG: - platform:', graphRAGResult.platform);
+                    console.log('🚨 DEBUG: - extraction_type:', graphRAGResult.extraction_type);
+                    
+                    if (graphRAGResult.analysis) {
+                        const analysis = graphRAGResult.analysis;
+                        console.log('🚨 DEBUG: analysis对象详细信息:');
+                        console.log('🚨 DEBUG: - content长度:', analysis.content?.length || 0);
+                        console.log('🚨 DEBUG: - content预览（前200字符）:', analysis.content?.substring(0, 200) || 'N/A');
+                        console.log('🚨 DEBUG: - entities数量:', analysis.entities?.length || 0);
+                        console.log('🚨 DEBUG: - concepts数量:', analysis.concepts?.length || 0);
+                        console.log('🚨 DEBUG: - relationships数量:', analysis.relationships?.length || 0);
+                        console.log('🚨 DEBUG: - confidence:', analysis.confidence);
+                        
+                        // 检查内容质量
+                        if (analysis.content) {
+                            const isGeneric = analysis.content.includes('关于 新闻 版权');
+                            const isShort = analysis.content.length < 200;
+                            const hasVideoContent = analysis.content.includes('♪') || 
+                                                  analysis.content.includes('lyrics') || 
+                                                  analysis.content.includes('transcript');
+                            
+                            console.log('🚨 DEBUG: 内容质量分析:');
+                            console.log('🚨 DEBUG: - 是通用YouTube页面:', isGeneric);
+                            console.log('🚨 DEBUG: - 内容过短 (<200):', isShort);
+                            console.log('🚨 DEBUG: - 包含视频内容标识:', hasVideoContent);
+                            
+                            if (isGeneric) {
+                                console.log('🚨 DEBUG: ⚠️  问题确认：返回的是YouTube通用页面内容，不是视频转录！');
+                                console.log('🚨 DEBUG: ⚠️  这表明后端没有正确检测到这是视频URL');
+                            }
+                            
+                            if (hasVideoContent) {
+                                console.log('🚨 DEBUG: ✅ 好消息：检测到视频内容，系统工作正常！');
+                            }
+                        }
+                        
+                        // 检查文件信息
+                        if (analysis.fileInfo) {
+                            console.log('🚨 DEBUG: fileInfo对象:');
+                            console.log('🚨 DEBUG: - filename:', analysis.fileInfo.filename);
+                            console.log('🚨 DEBUG: - type:', analysis.fileInfo.type);
+                            console.log('🚨 DEBUG: - source_url:', analysis.fileInfo.source_url);
+                            console.log('🚨 DEBUG: - textLength:', analysis.fileInfo.textLength);
+                        }
+                    }
+                    
+                    console.log('🚨 DEBUG: ======= GraphRAG响应分析完成 =======');
                     console.log('✅ GraphRAG Agent分析完成!');
                     console.log('🔍 完整分析结果:', JSON.stringify(graphRAGResult, null, 2));
                     
@@ -7443,7 +7994,7 @@ The challenge: How do we scale content production while preserving the casual, a
             
             // 基于真实内容的OpenAI分析
             async callOpenAIWithContent(fileName, content) {
-                const apiKey = 'YOUR_OPENAI_API_KEY_HERE'; // Replace with your OpenAI API key
+                const apiKey = process.env.OPENAI_API_KEY || 'your-openai-api-key-here';
                 
                 if (!apiKey) {
                     throw new Error('No OpenAI API key configured');
@@ -8095,6 +8646,9 @@ ${contentSample}
         // Multi-modal Input Functions
         let currentInputMode = 'text';
         let recognition = null;
+        
+        // Manual input tracking for Send button restriction
+        let isManualInput = false;
 
         // Switch input modes
         window.switchInputMode = function(mode) {
@@ -8173,10 +8727,109 @@ ${contentSample}
         // Fetch URL content from input and save to knowledge tree
         window.fetchUrlContentFromInput = async function(url) {
             console.log('🔗 Auto-fetching URL:', url);
+            console.log('🔍 DEBUG: 开始URL类型检测...');
+            console.log('🔍 DEBUG: URL包含youtube.com/watch?', url.includes('youtube.com/watch'));
+            console.log('🔍 DEBUG: URL包含youtu.be/?', url.includes('youtu.be/'));
             
+            // 🔥 YouTube URL 直接处理 - 使用视频提取管道
+            if (url.includes('youtube.com/watch') || url.includes('youtu.be/') || url.includes('bilibili.com') || url.includes('vimeo.com')) {
+                console.log('🎬 检测到视频URL，启用视频提取模式');
+                console.log('🔍 DEBUG: 视频检测逻辑命中，准备调用/api/scrape');
+                
+                // Show video specific loading state
+                const urlContent = document.getElementById('urlContent');
+                if (urlContent) {
+                    urlContent.style.display = 'block';
+                    urlContent.innerHTML = `
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                            <div style="width: 24px; height: 24px; border: 2px solid #3b82f6; border-top: transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                            <span>🎬 视频内容提取中: ${url}</span>
+                        </div>
+                    `;
+                }
+                
+                try {
+                    // 直接调用视频分析API，不走文件上传流程
+                    console.log('🔄 启动视频内容提取...');
+                    console.log('🔍 DEBUG: 发送API请求到 /api/scrape');
+                    console.log('🔍 DEBUG: 请求体:', { url: url });
+                    
+                    const response = await fetch('http://localhost:8000/api/scrape', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ url: url })
+                    });
+                    
+                    console.log('🔍 DEBUG: API响应状态:', response.status, response.statusText);
+                    
+                    if (!response.ok) {
+                        console.log('❌ DEBUG: API请求失败:', response.status);
+                        throw new Error(`视频分析失败: ${response.status}`);
+                    }
+                    
+                    const analysisResult = await response.json();
+                    console.log('🔍 DEBUG: API返回结果:', analysisResult);
+                    console.log('🔍 DEBUG: 结果状态:', analysisResult.status);
+                    console.log('🔍 DEBUG: 内容长度:', analysisResult?.analysis?.content?.length || 'N/A');
+                    
+                    if (analysisResult.status === 'success') {
+                        console.log('✅ 视频内容提取成功');
+                        console.log('🔍 DEBUG: 成功路径 - 准备显示结果');
+                        
+                        // 显示视频分析结果
+                        displayURLAnalysisResults(analysisResult.analysis, url);
+                        
+                        // 保存到知识树
+                        const videoFile = new File([analysisResult.analysis.content], 
+                            `video_${new URL(url).hostname}_${Date.now()}.txt`, 
+                            { type: 'text/plain' });
+                        videoFile.sourceUrl = url;
+                        
+                        await autoSaveToKnowledgeTree(videoFile, analysisResult);
+                        
+                        showNotification('🎬 视频内容提取完成并保存到知识库!');
+                        
+                        // 清理输入区域
+                        setTimeout(() => {
+                            clearUploadArea();
+                        }, 3000);
+                        
+                        return; // 直接返回，不继续常规流程
+                    } else {
+                        console.log('❌ DEBUG: 视频分析API返回失败状态');
+                        console.log('🔍 DEBUG: 失败消息:', analysisResult.message || 'N/A');
+                        throw new Error(analysisResult.message || '视频分析失败');
+                    }
+                    
+                } catch (error) {
+                    console.error('❌ 视频提取失败:', error);
+                    console.log('🔍 DEBUG: 进入视频提取错误处理分支');
+                    console.log('🔍 DEBUG: 错误类型:', error.name);
+                    console.log('🔍 DEBUG: 错误消息:', error.message);
+                    
+                    // 显示错误状态
+                    if (urlContent) {
+                        urlContent.innerHTML = `
+                            <h4 style="margin: 0 0 12px 0; color: #dc2626;">❌ 视频提取失败</h4>
+                            <p style="color: #6b7280; margin: 0 0 8px 0;">URL: ${url}</p>
+                            <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px; color: #dc2626;">
+                                ${error.message}
+                            </div>
+                        `;
+                    }
+                    
+                    showNotification('❌ 视频内容提取失败', 'error');
+                    console.log('🔍 DEBUG: 视频处理失败，即将返回，不继续通用URL流程');
+                    return; // 失败也直接返回，不继续常规流程
+                }
+            }
+
             // 🔥 GitHub URL 直接处理 - 避免HTML文件转换
             if (url.includes('github.com/') && url.match(/github\.com\/[^\/]+\/[^\/]+/)) {
                 console.log('🎯 检测到GitHub URL，启用直接处理模式');
+                console.log('🔍 DEBUG: GitHub URL处理分支开始');
                 
                 // Show GitHub specific loading state
                 const urlContent = document.getElementById('urlContent');
@@ -8232,6 +8885,12 @@ ${contentSample}
                 }
             }
             
+            // 🚨 DEBUG: 进入通用URL处理区域 - 这里可能拦截YouTube链接！
+            console.log('🚨 DEBUG: 进入通用URL处理区域');
+            console.log('🚨 DEBUG: 当前URL:', url);
+            console.log('🚨 DEBUG: YouTube检测结果 - isYouTube:', isYouTube);
+            console.log('🚨 DEBUG: 如果isYouTube为true但仍进入此区域，则说明YouTube检测有问题');
+            
             // Show URL content area with loading state
             const urlContent = document.getElementById('urlContent');
             if (urlContent) {
@@ -8245,12 +8904,16 @@ ${contentSample}
             }
             
             try {
+                // 🔧 DEBUG: 开始内容获取
+                console.log('🔧 DEBUG: 开始尝试获取URL内容');
+                
                 // Try multiple approaches to fetch URL content
                 let content = '';
                 let fetchError = null;
                 
                 // Method 1: Try direct fetch first (may fail due to CORS)
                 try {
+                    console.log('🔧 DEBUG: 尝试直接fetch');
                     const response = await fetch(url, {
                         method: 'GET',
                         mode: 'cors',
@@ -8261,12 +8924,13 @@ ${contentSample}
                     
                     if (response.ok) {
                         content = await response.text();
-                        console.log('✅ Direct fetch successful');
+                        console.log('✅ DEBUG: 直接fetch成功，内容长度:', content.length);
+                        console.log('🔧 DEBUG: 内容预览:', content.substring(0, 200));
                     } else {
                         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                     }
                 } catch (directError) {
-                    console.log('❌ Direct fetch failed (CORS):', directError.message);
+                    console.log('❌ DEBUG: 直接fetch失败 (CORS):', directError.message);
                     fetchError = directError;
                     
                     // Method 2: Try CORS proxy services
@@ -8310,9 +8974,18 @@ ${contentSample}
                 
                 console.log('✅ URL content fetched, length:', content.length);
                 
+                // 🚨 DEBUG: 开始HTML文本提取和元数据解析
+                console.log('🚨 DEBUG: 开始从HTML提取纯文本内容');
+                console.log('🚨 DEBUG: 原始HTML内容长度:', content.length);
+                console.log('🚨 DEBUG: HTML内容预览:', content.substring(0, 300));
+                
                 // 🔥 从HTML中提取纯文本内容
                 const cleanText = extractTextFromHTML(content);
                 console.log('🔧 HTML纯文本提取完成，长度:', cleanText.length);
+                console.log('🚨 DEBUG: 提取的纯文本预览:', cleanText.substring(0, 200));
+                
+                // 🚨 DEBUG: 开始解析HTML元数据
+                console.log('🚨 DEBUG: 开始解析HTML元数据');
                 
                 // Extract basic information from HTML
                 const parser = new DOMParser();
@@ -8322,6 +8995,19 @@ ${contentSample}
                                    doc.querySelector('meta[property="og:description"]')?.content || 
                                    'Web content analysis';
                 
+                console.log('🚨 DEBUG: 解析的标题:', title);
+                console.log('🚨 DEBUG: 解析的描述:', description);
+                console.log('🚨 DEBUG: 如果这是YouTube URL，标题应该包含视频信息，而不是通用页面标题');
+                
+                // 🚨 DEBUG: File对象创建过程追踪
+                console.log('🚨 DEBUG: ======= 关键问题点：File对象创建 =======');
+                console.log('🚨 DEBUG: 即将创建File对象，这里可能就是YouTube URL被错误处理的地方');
+                console.log('🚨 DEBUG: cleanText内容长度:', cleanText.length);
+                console.log('🚨 DEBUG: cleanText内容预览（前100字符）:', cleanText.substring(0, 100));
+                console.log('🚨 DEBUG: 文件名将设为:', `${title}.html`);
+                console.log('🚨 DEBUG: 文件类型将设为: text/html');
+                console.log('🚨 DEBUG: ⚠️  如果这是YouTube URL，这里应该检测到视频内容而不是通用HTML！');
+                
                 // Create a virtual file object for processing (使用提取的纯文本)
                 const urlFile = new File(
                     [cleanText], 
@@ -8329,10 +9015,19 @@ ${contentSample}
                     { type: 'text/html' }
                 );
                 
+                console.log('🚨 DEBUG: File对象已创建');
+                console.log('🚨 DEBUG: 创建的File对象大小:', urlFile.size, '字节');
+                console.log('🚨 DEBUG: 创建的File对象名称:', urlFile.name);
+                console.log('🚨 DEBUG: 创建的File对象类型:', urlFile.type);
+                
                 // Add URL metadata
                 urlFile.sourceUrl = url;
                 urlFile.title = title;
                 urlFile.description = description;
+                
+                console.log('🚨 DEBUG: 元数据已添加到File对象');
+                console.log('🚨 DEBUG: sourceUrl:', urlFile.sourceUrl);
+                console.log('🚨 DEBUG: ======= File对象创建完成，即将发送到后端 =======');
                 
                 console.log('🔄 Starting GraphRAG analysis for URL content...');
                 
@@ -8349,8 +9044,30 @@ ${contentSample}
                     `;
                 }
                 
+                // 🚨 DEBUG: 后端分析服务调用追踪
+                console.log('🚨 DEBUG: ======= 即将发送到GraphRAG后端分析 =======');
+                console.log('🚨 DEBUG: 准备调用 graphRAGService.analyzeFileOnUpload()');
+                console.log('🚨 DEBUG: 传递的urlFile对象详情:');
+                console.log('🚨 DEBUG: - File名称:', urlFile.name);
+                console.log('🚨 DEBUG: - File大小:', urlFile.size, '字节');
+                console.log('🚨 DEBUG: - File类型:', urlFile.type);
+                console.log('🚨 DEBUG: - sourceUrl:', urlFile.sourceUrl);
+                console.log('🚨 DEBUG: - title:', urlFile.title);
+                console.log('🚨 DEBUG: ⚠️  关键问题：如果这是YouTube URL，后端应该检测到视频内容！');
+                console.log('🚨 DEBUG: ⚠️  期望结果：2694字符的视频转录，而不是98字符的HTML页面！');
+                console.log('🚨 DEBUG: 正在发送到后端...');
+                
                 // Use GraphRAG service to analyze the content
                 const analysisResult = await graphRAGService.analyzeFileOnUpload(urlFile);
+                
+                console.log('🚨 DEBUG: ======= 后端分析结果返回 =======');
+                console.log('🚨 DEBUG: 分析结果状态:', analysisResult?.status);
+                console.log('🚨 DEBUG: 返回内容长度:', analysisResult?.analysis?.content?.length);
+                console.log('🚨 DEBUG: 内容预览（前100字符）:', analysisResult?.analysis?.content?.substring(0, 100));
+                console.log('🚨 DEBUG: 提取方法:', analysisResult?.extraction_method);
+                console.log('🚨 DEBUG: 平台检测:', analysisResult?.platform);
+                console.log('🚨 DEBUG: ⚠️  检查：如果是YouTube，应该显示"YouTube"平台和视频内容！');
+                console.log('🚨 DEBUG: ======= 后端分析完成 =======');
                 
                 // Save to knowledge tree automatically
                 console.log('🎯 URL analysis completed, auto-saving to knowledge tree');
@@ -9197,9 +9914,24 @@ ${contentSample}
             console.log('🤖 根据AI分析结果自动保存文件:', file.name);
             
             try {
-                // 获取AI建议的最佳路径
-                const suggestedPath = analysisResult.positionSuggestion?.primarySuggestion?.path || '智能分类/AI分析';
-                console.log('📍 AI建议的路径:', suggestedPath);
+                // 🔍 检查内容重复 - 基于URL或内容哈希
+                const isDuplicate = await checkContentDuplicate(file, analysisResult);
+                if (isDuplicate.found) {
+                    console.log('⚠️ 检测到重复内容，跳过保存:', isDuplicate.reason);
+                    showNotification(`⚠️ 内容已存在：${isDuplicate.existingFile} (${isDuplicate.reason})`, 'warning');
+                    
+                    // 直接导航到已存在的文件
+                    setTimeout(() => {
+                        openKnowledgePanel();
+                        navigateToKnowledgeTree(isDuplicate.category, isDuplicate.existingFile);
+                    }, 1000);
+                    return;
+                }
+                
+                // 🎯 改进分类准确性 - 基于内容类型和来源
+                const improvedPath = improveClassificationAccuracy(file, analysisResult);
+                console.log('📍 原AI路径:', analysisResult.positionSuggestion?.primarySuggestion?.path || '智能分类/AI分析');
+                console.log('📍 优化后路径:', improvedPath);
                 
                 // 🔥 保存原始文件到本地（用于后续用本地工具打开）
                 const fileStorageKey = await saveFileLocally(file);
@@ -9207,11 +9939,11 @@ ${contentSample}
                 // 🔥 存储GraphRAG分析数据（用于知识图谱构建）
                 await storeGraphRAGAnalysis(file.name, analysisResult);
                 
-                // 🔥 自动添加到知识树，使用AI指导的路径和存储键
-                await addFileWithAIGuidanceAndStorage(file.name, suggestedPath, analysisResult, file, fileStorageKey);
+                // 🔥 自动添加到知识树，使用优化的路径和存储键
+                await addFileWithAIGuidanceAndStorage(file.name, improvedPath, analysisResult, file, fileStorageKey);
                 
                 // 显示成功通知（只显示主要分类）
-                const mainCategory = suggestedPath.split(/[/>]/).filter(p => p.trim())[0] || '智能分类';
+                const mainCategory = improvedPath.split(/[/>]/).filter(p => p.trim())[0] || '智能分类';
                 showNotification(`🎯 AI已自动将 "${file.name}" 分类到 "${mainCategory}"`, 'success');
                 
                 // 🔄 自动跳转到知识库显示结果
@@ -9226,6 +9958,355 @@ ${contentSample}
                 console.error('❌ 自动保存失败:', error);
                 showNotification(`❌ 自动保存失败: ${error.message}`, 'error');
             }
+        }
+        
+        // 🔍 检查内容重复 - 基于URL、内容哈希或相似性检测
+        async function checkContentDuplicate(file, analysisResult) {
+            console.log('🔍 开始检查内容重复:', file.name);
+            
+            try {
+                const knowledgeTree = JSON.parse(localStorage.getItem('intelligentWorkflowKnowledgeTree') || '{}');
+                
+                // 1. 检查URL重复（对于网页内容）
+                if (file.sourceUrl) {
+                    for (const [categoryName, categoryData] of Object.entries(knowledgeTree)) {
+                        if (categoryData.files) {
+                            for (const existingFile of categoryData.files) {
+                                // 检查是否是同一个URL
+                                const storedFileData = localStorage.getItem(existingFile.storageKey);
+                                if (storedFileData) {
+                                    const fileData = JSON.parse(storedFileData);
+                                    if (fileData.sourceUrl === file.sourceUrl) {
+                                        return {
+                                            found: true,
+                                            reason: '相同URL',
+                                            existingFile: existingFile.name,
+                                            category: categoryName,
+                                            url: file.sourceUrl
+                                        };
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // 2. 检查内容哈希重复（对于文件内容）
+                const currentContent = analysisResult.analysis?.content || analysisResult.content || '';
+                if (currentContent.length > 100) {
+                    // 生成内容哈希
+                    const contentHash = await generateContentHash(currentContent);
+                    
+                    for (const [categoryName, categoryData] of Object.entries(knowledgeTree)) {
+                        if (categoryData.files) {
+                            for (const existingFile of categoryData.files) {
+                                // 检查现有文件的内容哈希
+                                const storedFileData = localStorage.getItem(existingFile.storageKey);
+                                if (storedFileData) {
+                                    const fileData = JSON.parse(storedFileData);
+                                    const existingContent = fileData.textContent || '';
+                                    
+                                    if (existingContent.length > 100) {
+                                        const existingHash = await generateContentHash(existingContent);
+                                        if (contentHash === existingHash) {
+                                            return {
+                                                found: true,
+                                                reason: '内容完全相同',
+                                                existingFile: existingFile.name,
+                                                category: categoryName,
+                                                similarity: 1.0
+                                            };
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // 3. 检查内容相似性（标题相似度检测）
+                const currentTitle = analysisResult.analysis?.fileInfo?.filename || file.name;
+                for (const [categoryName, categoryData] of Object.entries(knowledgeTree)) {
+                    if (categoryData.files) {
+                        for (const existingFile of categoryData.files) {
+                            const similarity = calculateStringSimilarity(currentTitle, existingFile.name);
+                            if (similarity > 0.85) { // 85%以上相似度认为可能重复
+                                // 进一步检查内容相似性
+                                const storedFileData = localStorage.getItem(existingFile.storageKey);
+                                if (storedFileData) {
+                                    const fileData = JSON.parse(storedFileData);
+                                    const existingContent = fileData.textContent || '';
+                                    const currentContent = analysisResult.analysis?.content || analysisResult.content || '';
+                                    
+                                    const contentSimilarity = calculateContentSimilarity(currentContent, existingContent);
+                                    if (contentSimilarity > 0.8) { // 80%以上内容相似度
+                                        return {
+                                            found: true,
+                                            reason: `高度相似 (${Math.round(similarity * 100)}%标题相似, ${Math.round(contentSimilarity * 100)}%内容相似)`,
+                                            existingFile: existingFile.name,
+                                            category: categoryName,
+                                            similarity: Math.max(similarity, contentSimilarity)
+                                        };
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                console.log('✅ 未发现重复内容');
+                return { found: false };
+                
+            } catch (error) {
+                console.error('❌ 检查重复内容失败:', error);
+                return { found: false };
+            }
+        }
+        
+        // 🎯 改进分类准确性 - 基于内容类型、来源和实际内容分析
+        function improveClassificationAccuracy(file, analysisResult) {
+            console.log('🎯 开始改进分类准确性');
+            
+            try {
+                // 获取原始AI建议路径
+                const originalPath = analysisResult.positionSuggestion?.primarySuggestion?.path || '智能分类/AI分析';
+                
+                // 1. 基于文件来源的分类优化
+                if (file.sourceUrl) {
+                    const url = new URL(file.sourceUrl);
+                    const hostname = url.hostname.toLowerCase();
+                    
+                    // YouTube视频分类
+                    if (hostname.includes('youtube.com') || hostname.includes('youtu.be')) {
+                        const title = analysisResult.analysis?.fileInfo?.filename || file.name;
+                        
+                        // 音乐类内容
+                        if (title.match(/(music|song|album|artist|mv|official|video)/i) ||
+                            analysisResult.analysis?.content?.match(/♪|♫|lyrics|歌词/g)) {
+                            return '多媒体内容/YouTube/音乐视频';
+                        }
+                        
+                        // 教育类内容
+                        if (title.match(/(tutorial|course|lesson|education|learn|how to)/i) ||
+                            analysisResult.analysis?.concepts?.some(c => 
+                                c.match(/(教程|课程|学习|教育|培训)/i))) {
+                            return '学习资料/在线教程/YouTube教学';
+                        }
+                        
+                        // 技术类内容
+                        if (analysisResult.analysis?.concepts?.some(c => 
+                            c.match(/(技术|编程|开发|coding|programming|tech)/i))) {
+                            return '技术资料/视频教程/YouTube技术';
+                        }
+                        
+                        // 默认YouTube分类
+                        return '多媒体内容/YouTube/视频内容';
+                    }
+                    
+                    // GitHub项目分类
+                    if (hostname.includes('github.com')) {
+                        // 检测编程语言
+                        const content = analysisResult.analysis?.content || '';
+                        if (content.includes('package.json') || content.includes('node_modules')) {
+                            return '技术资料/开源项目/JavaScript项目';
+                        }
+                        if (content.includes('requirements.txt') || content.includes('setup.py')) {
+                            return '技术资料/开源项目/Python项目';
+                        }
+                        if (content.includes('Cargo.toml') || content.includes('.rs')) {
+                            return '技术资料/开源项目/Rust项目';
+                        }
+                        if (content.includes('pom.xml') || content.includes('.java')) {
+                            return '技术资料/开源项目/Java项目';
+                        }
+                        return '技术资料/开源项目/代码仓库';
+                    }
+                    
+                    // 其他网站分类
+                    return `网页内容/${hostname.replace('www.', '')}/网页资料`;
+                }
+                
+                // 2. 基于文件类型的分类优化
+                const fileExtension = file.name.split('.').pop()?.toLowerCase();
+                if (fileExtension) {
+                    const documentTypes = ['pdf', 'doc', 'docx', 'txt', 'md', 'rtf'];
+                    const imageTypes = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp'];
+                    const codeTypes = ['js', 'ts', 'py', 'java', 'cpp', 'c', 'rs', 'go', 'php'];
+                    const dataTypes = ['json', 'csv', 'xml', 'yaml', 'yml'];
+                    
+                    if (documentTypes.includes(fileExtension)) {
+                        // 基于内容进一步分类文档
+                        const concepts = analysisResult.analysis?.concepts || [];
+                        if (concepts.some(c => c.match(/(技术|编程|开发|API|代码)/i))) {
+                            return `文档资料/技术文档/${fileExtension.toUpperCase()}文件`;
+                        }
+                        if (concepts.some(c => c.match(/(商业|业务|管理|报告)/i))) {
+                            return `文档资料/商业文档/${fileExtension.toUpperCase()}文件`;
+                        }
+                        return `文档资料/一般文档/${fileExtension.toUpperCase()}文件`;
+                    }
+                    
+                    if (imageTypes.includes(fileExtension)) {
+                        return `多媒体内容/图片文件/${fileExtension.toUpperCase()}图片`;
+                    }
+                    
+                    if (codeTypes.includes(fileExtension)) {
+                        return `技术资料/源代码/${fileExtension.toUpperCase()}代码`;
+                    }
+                    
+                    if (dataTypes.includes(fileExtension)) {
+                        return `数据文件/结构化数据/${fileExtension.toUpperCase()}数据`;
+                    }
+                }
+                
+                // 3. 基于内容概念的分类优化
+                const concepts = analysisResult.analysis?.concepts || [];
+                const entities = analysisResult.analysis?.entities || [];
+                const allTerms = [...concepts, ...entities].join(' ').toLowerCase();
+                
+                // 技术相关内容
+                if (allTerms.match(/(技术|开发|编程|代码|api|系统|架构|framework|库)/)) {
+                    return '技术资料/开发文档/技术分析';
+                }
+                
+                // 学习相关内容
+                if (allTerms.match(/(学习|教育|课程|教程|培训|知识|学科)/)) {
+                    return '学习资料/教育内容/知识文档';
+                }
+                
+                // 商业相关内容
+                if (allTerms.match(/(商业|业务|管理|市场|营销|策略|方案)/)) {
+                    return '商业资料/业务文档/管理资料';
+                }
+                
+                // 4. 使用原始AI路径但改进主要分类
+                const pathParts = originalPath.split(/[/>]/).filter(p => p.trim());
+                if (pathParts.length > 0) {
+                    const mainCategory = pathParts[0];
+                    
+                    // 改进主要分类的准确性
+                    const improvedMainCategory = improveMainCategoryName(mainCategory, allTerms);
+                    
+                    // 重构路径
+                    if (improvedMainCategory !== mainCategory) {
+                        return `${improvedMainCategory}/${pathParts.slice(1).join('/')}`;
+                    }
+                }
+                
+                console.log('📍 使用原始AI路径:', originalPath);
+                return originalPath;
+                
+            } catch (error) {
+                console.error('❌ 改进分类准确性失败:', error);
+                return analysisResult.positionSuggestion?.primarySuggestion?.path || '智能分类/AI分析';
+            }
+        }
+        
+        // 🔧 辅助函数：改进主要分类名称
+        function improveMainCategoryName(categoryName, contentTerms) {
+            const categoryLower = categoryName.toLowerCase();
+            
+            // 技术类别映射
+            if (categoryLower.match(/(tech|技术|开发|代码|programming)/)) {
+                return '技术资料';
+            }
+            
+            // 学习类别映射
+            if (categoryLower.match(/(learn|学习|教育|course|tutorial)/)) {
+                return '学习资料';
+            }
+            
+            // 文档类别映射
+            if (categoryLower.match(/(document|文档|doc|资料)/)) {
+                if (contentTerms.match(/(技术|开发|api|代码)/)) {
+                    return '技术资料';
+                }
+                if (contentTerms.match(/(商业|业务|管理)/)) {
+                    return '商业资料';
+                }
+                return '文档资料';
+            }
+            
+            // 多媒体类别映射
+            if (categoryLower.match(/(media|多媒体|视频|音频|图片)/)) {
+                return '多媒体内容';
+            }
+            
+            return categoryName; // 如果没有匹配，保持原名
+        }
+        
+        // 🔨 辅助函数：生成内容哈希
+        async function generateContentHash(content) {
+            // 简化的哈希函数（基于内容的前1000字符）
+            const normalizedContent = content.trim().substring(0, 1000).replace(/\s+/g, ' ');
+            let hash = 0;
+            for (let i = 0; i < normalizedContent.length; i++) {
+                const char = normalizedContent.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash; // 转为32位整数
+            }
+            return hash.toString();
+        }
+        
+        // 🔨 辅助函数：计算字符串相似度
+        function calculateStringSimilarity(str1, str2) {
+            if (!str1 || !str2) return 0;
+            
+            const longer = str1.length > str2.length ? str1 : str2;
+            const shorter = str1.length > str2.length ? str2 : str1;
+            
+            if (longer.length === 0) return 1.0;
+            
+            const distance = levenshteinDistance(longer, shorter);
+            return (longer.length - distance) / longer.length;
+        }
+        
+        // 🔨 辅助函数：计算内容相似度
+        function calculateContentSimilarity(content1, content2) {
+            if (!content1 || !content2) return 0;
+            
+            // 基于关键词重叠度计算相似性
+            const words1 = content1.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+            const words2 = content2.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+            
+            if (words1.length === 0 || words2.length === 0) return 0;
+            
+            const uniqueWords1 = new Set(words1);
+            const uniqueWords2 = new Set(words2);
+            
+            const intersection = new Set([...uniqueWords1].filter(w => uniqueWords2.has(w)));
+            const union = new Set([...uniqueWords1, ...uniqueWords2]);
+            
+            return union.size > 0 ? intersection.size / union.size : 0;
+        }
+        
+        // 🔨 辅助函数：编辑距离算法
+        function levenshteinDistance(str1, str2) {
+            const matrix = [];
+            
+            for (let i = 0; i <= str2.length; i++) {
+                matrix[i] = [i];
+            }
+            
+            for (let j = 0; j <= str1.length; j++) {
+                matrix[0][j] = j;
+            }
+            
+            for (let i = 1; i <= str2.length; i++) {
+                for (let j = 1; j <= str1.length; j++) {
+                    if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+                        matrix[i][j] = matrix[i - 1][j - 1];
+                    } else {
+                        matrix[i][j] = Math.min(
+                            matrix[i - 1][j - 1] + 1,
+                            matrix[i][j - 1] + 1,
+                            matrix[i - 1][j] + 1
+                        );
+                    }
+                }
+            }
+            
+            return matrix[str2.length][str1.length];
         }
         
         // 💾 智能存储管理器
@@ -10719,7 +11800,7 @@ ${contentSample}
                 const formData = new FormData();
                 formData.append('file', file);
                 
-                const response = await fetch('http://127.0.0.1:8001/api/graphrag/analyze', {
+                const response = await fetch('http://127.0.0.1:8000/api/graphrag/analyze', {
                     method: 'POST',
                     body: formData
                 });
@@ -13024,6 +14105,13 @@ PDF内容提取服务暂时不可用。
                 voiceTranscript.innerHTML = '';
             }
             
+            // 🔥 清空结果显示区域
+            const resultsContainer = document.getElementById('results');
+            if (resultsContainer) {
+                resultsContainer.innerHTML = '';
+                console.log('🧹 已清空结果显示区域');
+            }
+            
             // 重置文件输入
             const fileInputs = document.querySelectorAll('input[type="file"]');
             fileInputs.forEach(input => {
@@ -13032,6 +14120,10 @@ PDF内容提取服务暂时不可用。
             
             // 清空全局文件变量
             window.currentUploadedFiles = [];
+            
+            // 🔥 清空全局结果缓存
+            window.lastAnalysisResult = null;
+            window.lastProcessedContent = null;
             
             // 重置上传区域状态
             const uploadArea = document.querySelector('.upload-area');
